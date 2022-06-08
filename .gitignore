@@ -1,4 +1,4 @@
 .DS_Store
 *.scss
-*.json
+/**/*.json
 node_modules
