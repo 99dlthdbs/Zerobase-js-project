@@ -5,6 +5,8 @@
     return document.querySelector(target)
   }
 
+  const $posts = get('.posts')
+
   const getPost = async () => {
     const API_URL = 'https://jsonplaceholder.typicode.com/posts'
     const response = await fetch(API_URL)
@@ -14,8 +16,26 @@
     return await response.json()
   }
 
-  const loadPost = () => {
-    getPost()
+  const showPosts = (posts) => {
+    posts.forEach((post) => {
+      const $post = document.childElement('div')
+      $post.classList.add('post')
+      $post.innerHMTL = `
+        <div class="header">
+          <div class="id">${post.id}</div>
+          <div class="title">${post.title}</div>
+        </div>
+        <div class="body">
+          ${post.body}
+        </div>
+      `
+      $posts.appendChild($post)
+    })
+  }
+
+  const loadPost = async () => {
+    const response = getPost()
+    showPosts(response)
   }
 
   window.addEventListener('DOMContentLoaded', () => {
