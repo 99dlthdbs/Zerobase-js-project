@@ -1,193 +1,227 @@
 ;(function () {
-  ;('use strict')
+  'use strict'
 
-  const get = (target) => document.querySelector(target)
-  const getAll = (target) => document.querySelectorAll(target)
+  const get = (target) => {
+    return document.querySelector(target)
+  }
+  const getAll = (target) => {
+    return document.querySelectorAll(target)
+  }
 
-  const $search = get('#search')
-  const $list = getAll('.contents.list figure')
-  const $searchButton = get('.btn_search')
+  const $todos = get('.todos')
+  const $form = get('.todo_form')
+  const $todoInput = get('.todo_input')
+  const $pagination = get('.pagination')
+  const API_URL = `http://localhost:3000/todos`
 
-  const $player = get('.view video')
-  const $btnPlay = get('.js-play')
-  const $btnReplay = get('.js-replay')
-  const $btnStop = get('.js-stop')
-  const $btnMute = get('.js-mute')
-  const $progress = get('.js-progress')
-  const $volume = get('.js-volume')
-  const $fullScreen = get('.js-fullScreen')
+  let currentPage = 1
+  const totalCount = 53
+  const pageCount = 5
+  const limit = 5
+
+  const pagination = () => {
+    let totalPage = Math.ceil(totalCount / limit)
+    let pageGroup = Math.ceil(currentPage / pageCount)
+    let lastNumber = pageGroup * pageCount
+    if (lastNumber > totalPage) {
+      lastNumber = totalPage
+    }
+    let firstNumber = lastNumber - (pageCount - 1)
+
+    const next = lastNumber + 1
+    const prev = firstNumber - 1
+
+    let html = ''
+
+    if (prev > 0) {
+      html += "<button class='prev' data-fn='prev'>이전</button> "
+    }
+
+    for (let i = firstNumber; i <= lastNumber; i++) {
+      html += `<button class="pageNumber" id="page_${i}">${i}</button>`
+    }
+    if (lastNumber < totalPage) {
+      html += `<button class='next' data-fn='next'>다음</button>`
+    }
+
+    $pagination.innerHTML = html
+    const $currentPageNumber = get(`.pageNumber#page_${currentPage}`)
+    $currentPageNumber.style.color = '#9dc0e8'
+
+    const $currentPageNumbers = getAll(`.pagination button`)
+    $currentPageNumbers.forEach((button) => {
+      button.addEventListener('click', () => {
+        if (button.dataset.fn === 'prev') {
+          currentPage = prev
+        } else if (button.dataset.fn === 'next') {
+          currentPage = next
+        } else {
+          currentPage = button.innerText
+        }
+        pagination()
+        getTodos()
+      })
+    })
+  }
+
+  const createTodoElement = (item) => {
+    const { id, content, completed } = item
+    const isChecked = completed ? 'checked' : ''
+    const $todoItem = document.createElement('div')
+    $todoItem.classList.add('item')
+    $todoItem.dataset.id = id
+    $todoItem.innerHTML = `
+            <div class="content">
+              <input
+                type="checkbox"
+                class='todo_checkbox'
+                ${isChecked}
+              />
+              <label>${content}</label>
+              <input type="text" value="${content}" />
+            </div>
+            <div class="item_buttons content_buttons">
+              <button class="todo_edit_button">
+                <i class="far fa-edit"></i>
+              </button>
+              <button class="todo_remove_button">
+                <i class="far fa-trash-alt"></i>
+              </button>
+            </div>
+            <div class="item_buttons edit_buttons">
+              <button class="todo_edit_confirm_button">
+                <i class="fas fa-check"></i>
+              </button>
+              <button class="todo_edit_cancel_button">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+      `
+    return $todoItem
+  }
+
+  const renderAllTodos = (todos) => {
+    $todos.innerHTML = ''
+    todos.forEach((item) => {
+      const todoElement = createTodoElement(item)
+      $todos.appendChild(todoElement)
+    })
+  }
+
+  const getTodos = () => {
+    fetch(`${API_URL}?_page=${currentPage}&_limit=${limit}`)
+      .then((response) => response.json())
+      .then((todos) => {
+        renderAllTodos(todos)
+      })
+      .catch((error) => console.error(error.message))
+  }
+
+  const addTodo = (e) => {
+    e.preventDefault()
+    const content = $todoInput.value
+    if (!content) return
+    const todo = {
+      content,
+      completed: false,
+    }
+    fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-type': 'application/json' },
+      body: JSON.stringify(todo),
+    })
+      .then((response) => response.json())
+      .then(getTodos)
+      .then(() => {
+        $todoInput.value = ''
+        $todoInput.focus()
+      })
+      .catch((error) => console.error(error.message))
+  }
+
+  const toggleTodo = (e) => {
+    if (e.target.className !== 'todo_checkbox') return
+    const $item = e.target.closest('.item')
+    const id = $item.dataset.id
+    const completed = e.target.checked
+    fetch(`${API_URL}/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-type': 'application/json' },
+      body: JSON.stringify({ completed }),
+    })
+      .then((response) => response.json())
+      .then(getTodos)
+      .catch((error) => console.error(error.message))
+  }
+
+  const changeEditMode = (e) => {
+    const $item = e.target.closest('.item')
+    const $label = $item.querySelector('label')
+    const $editInput = $item.querySelector('input[type="text"]')
+    const $contentButtons = $item.querySelector('.content_buttons')
+    const $editButtons = $item.querySelector('.edit_buttons')
+    const value = $editInput.value
+
+    if (e.target.className === 'todo_edit_button') {
+      $label.style.display = 'none'
+      $editInput.style.display = 'block'
+      $contentButtons.style.display = 'none'
+      $editButtons.style.display = 'block'
+      $editInput.focus()
+      $editInput.value = ''
+      $editInput.value = value
+    }
+
+    if (e.target.className === 'todo_edit_cancel_button') {
+      $label.style.display = 'block'
+      $editInput.style.display = 'none'
+      $contentButtons.style.display = 'block'
+      $editButtons.style.display = 'none'
+      $editInput.value = $label.innerText
+    }
+  }
+
+  const editTodo = (e) => {
+    if (e.target.className !== 'todo_edit_confirm_button') return
+    const $item = e.target.closest('.item')
+    const id = $item.dataset.id
+    const $editInput = $item.querySelector('input[type="text"]')
+    const content = $editInput.value
+
+    fetch(`${API_URL}/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-type': 'application/json' },
+      body: JSON.stringify({ content }),
+    })
+      .then((response) => response.json())
+      .then(getTodos)
+      .catch((error) => console.error(error.message))
+  }
+
+  const removeTodo = (e) => {
+    if (e.target.className !== 'todo_remove_button') return
+    const $item = e.target.closest('.item')
+    const id = $item.dataset.id
+
+    fetch(`${API_URL}/${id}`, {
+      method: 'DELETE',
+    })
+      .then((response) => response.json())
+      .then(getTodos)
+      .catch((error) => console.error(error.message))
+  }
 
   const init = () => {
-    $search.addEventListener('keyup', search)
-    $searchButton.addEventListener('click', search)
-    for (let index = 0; index < $list.length; index++) {
-      const $target = $list[index].querySelector('picture')
-      $target.addEventListener('mouseover', onMouseOver)
-      $target.addEventListener('mouseout', onMouseOut)
-    }
-    for (let index = 0; index < $list.length; index++) {
-      $list[index].addEventListener('click', hashChange)
-    }
-    window.addEventListener('hashchange', () => {
-      const isView = -1 < window.location.hash.indexOf('view')
-      if (isView) {
-        getViewPage()
-      } else {
-        getListPage()
-      }
+    window.addEventListener('DOMContentLoaded', () => {
+      getTodos()
+      pagination()
     })
 
-    viewPageEvent()
-  }
-
-  const search = () => {
-    let searchText = $search.value.toLowerCase()
-    for (let index = 0; index < $list.length; index++) {
-      const $target = $list[index].querySelector('strong')
-      const text = $target.textContent.toLowerCase()
-      if (-1 < text.indexOf(searchText)) {
-        $list[index].style.display = 'flex'
-      } else {
-        $list[index].style.display = 'none'
-      }
-    }
-  }
-
-  const onMouseOver = (e) => {
-    const webpPlay = e.target.parentNode.querySelector('source')
-    webpPlay.setAttribute('srcset', './assets/sample.webp')
-  }
-
-  const onMouseOut = (e) => {
-    const webpPlay = e.target.parentNode.querySelector('source')
-    webpPlay.setAttribute('srcset', './assets/sample.jpg')
-  }
-
-  const hashChange = (e) => {
-    e.preventDefault()
-    const parentNode = e.target.closest('figure')
-    const viewTitle = parentNode.querySelector('strong').textContent
-    window.location.hash = `view&${viewTitle}`
-    getViewPage()
-  }
-
-  const getViewPage = () => {
-    const viewTitle = get('.view strong')
-    const urlTItle = decodeURI(window.location.hash.split('&')[1])
-    viewTitle.innerText = urlTItle
-
-    get('.list').style.display = 'none'
-    get('.view').style.display = 'flex'
-  }
-
-  const getListPage = () => {
-    get('.view').style.display = 'none'
-    get('.list').style.display = 'flex'
-  }
-
-  const buttonChange = (btn, value) => {
-    btn.innerHTML = value
-  }
-
-  const viewPageEvent = () => {
-    $volume.addEventListener('change', (e) => {
-      $player.volume = e.target.value
-    })
-    $player.addEventListener('timeupdate', setProgress)
-    $player.addEventListener('play', buttonChange($btnPlay, 'pause'))
-    $player.addEventListener('pause', buttonChange($btnPlay, 'play'))
-    $player.addEventListener('volumechange', () => {
-      $player.muted
-        ? buttonChange($btnMute, 'unmute')
-        : buttonChange($btnMute, 'mute')
-    })
-    $player.addEventListener('ended', $player.pause())
-    $progress.addEventListener('click', getCurrent)
-
-    $btnPlay.addEventListener('click', playVideo)
-    $btnReplay.addEventListener('click', replayVideo)
-    $btnStop.addEventListener('click', stopVideo)
-    $btnMute.addEventListener('click', mute)
-    $fullScreen.addEventListener('click', fullScreen)
-  }
-
-  const getCurrent = (e) => {
-    let percent = e.offsetX / $progress.offsetWidth
-    $player.currentTime = percent * $player.duration
-    e.target.value = Math.floor(percent / 100)
-  }
-
-  const setProgress = () => {
-    let percentage = Math.floor((100 / $player.duration) * $player.currentTime)
-    $progress.value = percentage
-  }
-
-  const playVideo = () => {
-    if ($player.paused || $player.ended) {
-      buttonChange($btnPlay, 'pause')
-      $player.play()
-    } else {
-      buttonChange($btnPlay, 'play')
-      $player.pause()
-    }
-  }
-
-  const stopVideo = () => {
-    $player.pause()
-    $player.currentTime = 0
-    buttonChange($btnPlay, 'play')
-  }
-
-  const resetPlayer = () => {
-    $progress.value = 0
-    $player.currentTime = 0
-    buttonChange($btnPlay, 'play')
-  }
-
-  const replayVideo = () => {
-    resetPlayer()
-    $player.play()
-    buttonChange($btnPlay, 'pause')
-  }
-
-  const mute = () => {
-    if ($player.muted) {
-      buttonChange($btnMute, 'mute')
-      $player.muted = false
-    } else {
-      buttonChange($btnMute, 'unmute')
-      $player.muted = true
-    }
-  }
-
-  const fullScreen = () => {
-    if ($player.requestFullscreen)
-      if (document.fullScreenElement) {
-        document.cancelFullScreen()
-      } else {
-        $player.requestFullscreen()
-      }
-    else if ($player.msRequestFullscreen)
-      if (document.msFullscreenElement) {
-        document.msExitFullscreen()
-      } else {
-        $player.msRequestFullscreen()
-      }
-    else if ($player.mozRequestFullScreen)
-      if (document.mozFullScreenElement) {
-        document.mozCancelFullScreen()
-      } else {
-        $player.mozRequestFullScreen()
-      }
-    else if ($player.webkitRequestFullscreen)
-      if (document.webkitFullscreenElement) {
-        document.webkitCancelFullScreen()
-      } else {
-        $player.webkitRequestFullscreen()
-      }
-    else {
-      alert('Not Supported')
-    }
+    $form.addEventListener('submit', addTodo)
+    $todos.addEventListener('click', toggleTodo)
+    $todos.addEventListener('click', changeEditMode)
+    $todos.addEventListener('click', editTodo)
+    $todos.addEventListener('click', removeTodo)
   }
 
   init()
